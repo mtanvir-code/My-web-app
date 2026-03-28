@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FleetOps — Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --bg2: #10131a;
+    --bg3: #181c27;
+    --border: #1e2535;
+    --accent: #00e5a0;
+    --accent2: #ff6b35;
+    --accent3: #4fc3f7;
+    --warn: #ffb300;
+    --text: #e8eaf2;
+    --muted: #5a6380;
+    --sidebar-w: 220px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .logo {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-mark {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  .logo-mark span {
+    color: var(--accent);
+  }
+
+  .logo-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-top: 3px;
+    text-transform: uppercase;
+  }
+
+  .nav {
+    padding: 20px 12px;
+    flex: 1;
+  }
+
+  .nav-section {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0 12px;
+    margin-bottom: 8px;
+    margin-top: 20px;
+  }
+
+  .nav-section:first-child { margin-top: 0; }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: rgba(0,229,160,0.08); color: var(--accent); }
+  .nav-item.active .nav-icon { color: var(--accent); }
+
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .nav-badge {
+    margin-left: auto;
+    background: var(--accent2);
+    color: white;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+
+  .sidebar-bottom {
+    padding: 16px 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--bg3);
+  }
+
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #0a0c10;
+  }
+
+  .user-info { flex: 1; overflow: hidden; }
+  .user-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-role { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
+
+  /* ── MAIN ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .topbar {
+    height: 64px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    gap: 16px;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+
+  .page-title {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+
+  .topbar-divider { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+  .status-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(0,229,160,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(0,229,160,0.2);
+    letter-spacing: 0.5px;
+  }
+
+  .topbar-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0c10;
+  }
+
+  .btn-primary:hover { opacity: 0.85; }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 32px;
+  }
+
+  /* ── STATS CARDS ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-card:nth-child(1) { animation-delay: 0.05s; }
+  .stat-card:nth-child(2) { animation-delay: 0.1s; }
+  .stat-card:nth-child(3) { animation-delay: 0.15s; }
+  .stat-card:nth-child(4) { animation-delay: 0.2s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .stat-meta {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .stat-delta { font-weight: 700; }
+  .stat-delta.up { color: var(--accent); }
+  .stat-delta.down { color: var(--accent2); }
+  .stat-delta.warn { color: var(--warn); }
+
+  .stat-icon {
+    position: absolute;
+    top: 20px; right: 20px;
+    font-size: 28px;
+    opacity: 0.15;
+  }
+
+  .stat-bar {
+    margin-top: 14px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--bg3);
+    overflow: hidden;
+  }
+
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 1s ease;
+  }
+
+  /* ── CHARTS ROW ── */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+    animation: fadeUp 0.4s ease 0.25s both;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .card-title {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+  }
+
+  .card-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ── TABLE ── */
+  .table-section { animation: fadeUp 0.4s ease 0.3s both; }
+
+  .table-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+
+  .search-box input {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    width: 180px;
+  }
+
+  .search-box input::placeholder { color: var(--muted); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 12px 24px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  thead th:hover { color: var(--text); }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    cursor: pointer;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--bg3); }
+
+  tbody td {
+    padding: 14px 24px;
+    font-size: 13px;
+  }
+
+  .vehicle-cell { display: flex; align-items: center; gap: 12px; }
+
+  .vehicle-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    background: var(--bg3);
+    flex-shrink: 0;
+  }
+
+  .vehicle-name { font-weight: 700; font-size: 13px; }
+  .vehicle-id { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  .status-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .status-active { background: rgba(0,229,160,0.1); color: var(--accent); }
+  .status-active::before { background: var(--accent); }
+  .status-idle { background: rgba(79,195,247,0.1); color: var(--accent3); }
+  .status-idle::before { background: var(--accent3); }
+  .status-maintenance { background: rgba(255,179,0,0.1); color: var(--warn); }
+  .status-maintenance::before { background: var(--warn); }
+  .status-offline { background: rgba(90,99,128,0.15); color: var(--muted); }
+  .status-offline::before { background: var(--muted); }
+
+  .fuel-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+
+  .fuel-track {
+    width: 60px; height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .fuel-fill { height: 100%; border-radius: 2px; }
+  .fuel-high { background: var(--accent); }
+  .fuel-mid { background: var(--warn); }
+  .fuel-low { background: var(--accent2); }
+
+  .mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+  /* scrollbar */
+  .content::-webkit-scrollbar { width: 4px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* live dot */
+  .live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">Fleet<span>Ops</span></div>
+    <div class="logo-sub">Command Center v2.4</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Main</div>
+    <div class="nav-item active">
+      <span class="nav-icon">⊞</span> Dashboard
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">🚛</span> Vehicles
+      <span class="nav-badge">48</span>
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">📍</span> Live Map
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">👤</span> Drivers
+    </div>
+    <div class="nav-section">Operations</div>
+    <div class="nav-item">
+      <span class="nav-icon">📋</span> Routes
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">⚙️</span> Maintenance
+      <span class="nav-badge">3</span>
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">⛽</span> Fuel Logs
+    </div>
+    <div class="nav-section">Reports</div>
+    <div class="nav-item">
+      <span class="nav-icon">📊</span> Analytics
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">🔔</span> Alerts
+      <span class="nav-badge">7</span>
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-card">
+      <div class="avatar">AK</div>
+      <div class="user-info">
+        <div class="user-name">Ahmed K.</div>
+        <div class="user-role">Fleet Manager</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title">Dashboard</div>
+    <div class="topbar-divider"></div>
+    <span class="live-dot"></span>
+    <div class="status-pill">LIVE TRACKING ON</div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost">Export</button>
+      <button class="btn btn-primary">+ Add Vehicle</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- STATS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🚛</div>
+        <div class="stat-label">Total Vehicles</div>
+        <div class="stat-value">48</div>
+        <div class="stat-meta"><span class="stat-delta up">↑ 2</span> added this month</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-label">Active Now</div>
+        <div class="stat-value" style="color:var(--accent)">31</div>
+        <div class="stat-meta"><span class="stat-delta up">64.6%</span> utilization rate</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:64.6%;background:var(--accent)"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-label">In Maintenance</div>
+        <div class="stat-value" style="color:var(--warn)">5</div>
+        <div class="stat-meta"><span class="stat-delta warn">↑ 2</span> since last week</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:10.4%;background:var(--warn)"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-label">KM Today</div>
+        <div class="stat-value">18,340</div>
+        <div class="stat-meta"><span class="stat-delta up">↑ 8.2%</span> vs yesterday</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width:78%;background:var(--accent3)"></div></div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Distance Travelled — Last 7 Days</div>
+            <div class="card-subtitle">KM per day across full fleet</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="lineChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Fleet Status</div>
+            <div class="card-subtitle">Current distribution</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="doughnutChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-section">
+      <div class="table-wrap">
+        <div class="table-header">
+          <div>
+            <div class="card-title">Vehicle Fleet</div>
+            <div class="card-subtitle">All registered vehicles</div>
+          </div>
+          <div class="search-box">
+            <span style="color:var(--muted)">⌕</span>
+            <input type="text" id="searchInput" placeholder="Search vehicle..." oninput="filterTable()">
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Status</th>
+              <th>Driver</th>
+              <th>Location</th>
+              <th>Fuel</th>
+              <th>KM Today</th>
+              <th>Last Update</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── DATA ──
+const vehicles = [
+  { icon:'🚛', name:'Volvo FH16', id:'VH-001', status:'active', driver:'Mohammed A.', location:'Riyadh → Jeddah', fuel:82, km:312, updated:'2 min ago' },
+  { icon:'🚚', name:'Mercedes Actros', id:'VH-002', status:'active', driver:'Khalid R.', location:'Dammam Ring Rd', fuel:67, km:198, updated:'1 min ago' },
+  { icon:'🚌', name:'MAN TGX', id:'VH-003', status:'idle', driver:'Omar S.', location:'Riyadh Hub', fuel:91, km:0, updated:'12 min ago' },
+  { icon:'🚐', name:'Ford Transit', id:'VH-004', status:'maintenance', driver:'Unassigned', location:'Workshop Bay 3', fuel:45, km:0, updated:'3 hrs ago' },
+  { icon:'🚛', name:'Scania R500', id:'VH-005', status:'active', driver:'Faisal M.', location:'Makkah Rd KM 42', fuel:54, km:287, updated:'5 min ago' },
+  { icon:'🚚', name:'DAF XF', id:'VH-006', status:'active', driver:'Saad H.', location:'King Fahd Rd', fuel:29, km:411, updated:'3 min ago' },
+  { icon:'🚌', name:'Iveco Stralis', id:'VH-007', status:'offline', driver:'Unassigned', location:'Last: Jeddah Port', fuel:18, km:0, updated:'2 days ago' },
+  { icon:'🚛', name:'Kenworth T680', id:'VH-008', status:'active', driver:'Nasser K.', location:'Al-Qassim Hwy', fuel:73, km:156, updated:'7 min ago' },
+  { icon:'🚐', name:'Toyota HiAce', id:'VH-009', status:'idle', driver:'Yousef B.', location:'Riyadh South', fuel:88, km:42, updated:'22 min ago' },
+  { icon:'🚚', name:'Peterbilt 579', id:'VH-010', status:'maintenance', driver:'Unassigned', location:'Workshop Bay 1', fuel:60, km:0, updated:'5 hrs ago' },
+];
+
+function fuelClass(v) {
+  if (v >= 60) return 'fuel-high';
+  if (v >= 30) return 'fuel-mid';
+  return 'fuel-low';
+}
+
+function statusBadge(s) {
+  const map = { active:'status-active', idle:'status-idle', maintenance:'status-maintenance', offline:'status-offline' };
+  const label = { active:'Active', idle:'Idle', maintenance:'Maintenance', offline:'Offline' };
+  return `<span class="status-badge ${map[s]}">${label[s]}</span>`;
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = data.map(v => `
+    <tr>
+      <td>
+        <div class="vehicle-cell">
+          <div class="vehicle-icon">${v.icon}</div>
+          <div>
+            <div class="vehicle-name">${v.name}</div>
+            <div class="vehicle-id">${v.id}</div>
+          </div>
+        </div>
+      </td>
+      <td>${statusBadge(v.status)}</td>
+      <td style="font-size:13px">${v.driver}</td>
+      <td style="font-size:12px;color:var(--muted)">${v.location}</td>
+      <td>
+        <div class="fuel-bar">
+          <div class="fuel-track"><div class="fuel-fill ${fuelClass(v.fuel)}" style="width:${v.fuel}%"></div></div>
+          <span style="color:${v.fuel<30?'var(--accent2)':v.fuel<60?'var(--warn)':'var(--accent)'}">${v.fuel}%</span>
+        </div>
+      </td>
+      <td class="mono">${v.km > 0 ? v.km.toLocaleString() + ' km' : '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${v.updated}</td>
+    </tr>
+  `).join('');
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = vehicles.filter(v =>
+    v.name.toLowerCase().includes(q) ||
+    v.id.toLowerCase().includes(q) ||
+    v.driver.toLowerCase().includes(q) ||
+    v.location.toLowerCase().includes(q)
+  );
+  renderTable(filtered);
+}
+
+renderTable(vehicles);
+
+// ── CHARTS ──
+Chart.defaults.color = '#5a6380';
+Chart.defaults.borderColor = '#1e2535';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+
+// Line Chart
+const lineCtx = document.getElementById('lineChart').getContext('2d');
+const gradient = lineCtx.createLinearGradient(0, 0, 0, 200);
+gradient.addColorStop(0, 'rgba(0,229,160,0.25)');
+gradient.addColorStop(1, 'rgba(0,229,160,0)');
+
+new Chart(lineCtx, {
+  type: 'line',
+  data: {
+    labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    datasets: [{
+      label: 'KM',
+      data: [14200, 16800, 15400, 17900, 16200, 14800, 18340],
+      borderColor: '#00e5a0',
+      backgroundColor: gradient,
+      borderWidth: 2,
+      pointBackgroundColor: '#00e5a0',
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.4,
+      fill: true,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: {
+      label: ctx => ' ' + ctx.parsed.y.toLocaleString() + ' km'
+    }}},
+    scales: {
+      x: { grid: { color: '#1e2535' }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: '#1e2535' }, ticks: { font: { size: 10 }, callback: v => (v/1000).toFixed(0)+'k' } }
+    }
+  }
+});
+
+// Doughnut Chart
+const dCtx = document.getElementById('doughnutChart').getContext('2d');
+new Chart(dCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Active','Idle','Maintenance','Offline'],
+    datasets: [{
+      data: [31, 8, 5, 4],
+      backgroundColor: ['#00e5a0','#4fc3f7','#ffb300','#2a3042'],
+      borderColor: '#10131a',
+      borderWidth: 3,
+      hoverBorderWidth: 0,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '72%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { boxWidth: 10, padding: 16, font: { size: 10 } }
+      }
+    }
+  }
+});
+
+// Nav interaction
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
